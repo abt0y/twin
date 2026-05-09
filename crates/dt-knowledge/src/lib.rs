@@ -30,8 +30,12 @@
 pub mod db;
 pub mod edge;
 pub mod error;
+pub mod export;
+pub mod lean;
+pub mod meta_cognition;
 pub mod node;
 pub mod projection;
+pub mod reasoning;
 pub mod repository;
 pub mod service;
 
@@ -39,8 +43,11 @@ pub use db::KnowledgeDb;
 
 pub use edge::{KnowledgeEdge, Relation};
 pub use error::KnowledgeError;
+pub use lean::{ExternalLeanVerifier, LeanProofStatus, LeanVerdict, LeanVerifier, LeanVerification, StubLeanVerifier};
+pub use meta_cognition::{CertaintyType, MetaCognition, ThinkingStep};
 pub use node::{KnowledgeNode, NodeContent, NodeStatus, NodeType, Visibility};
 pub use projection::KnowledgeProjection;
+pub use reasoning::{ContradictionReport, EvidenceChain, ReasoningEngine};
 pub use repository::{KnowledgeRepository, NeighborDirection};
 pub use service::KnowledgeService;
 

@@ -11,9 +11,13 @@ use dt_event::{
     Event, EventBuilder, EventStore, EventStoreConfig, EventType, MetadataEnvelope,
 };
 use dt_knowledge::{
-    service::NodePatch, KnowledgeDb, KnowledgeProjection, KnowledgeRepository, KnowledgeService,
-    NeighborDirection, NodeContent, NodeStatus, NodeType, Relation,
+    export::GraphScene, reasoning::ReasoningEngine, service::NodePatch, CertaintyType,
+    ExternalLeanVerifier, KnowledgeDb, KnowledgeProjection, KnowledgeRepository, KnowledgeService,
+    LeanVerifier, MetaCognition, NeighborDirection, NodeContent, NodeStatus, NodeType, Relation,
+    StubLeanVerifier, ThinkingStep,
 };
+use dt_graph_ui::Dashboard;
+use dt_core::cas::CasStore;
 
 #[derive(Parser)]
 #[command(name = "dt")]
@@ -47,6 +51,12 @@ enum Commands {
     Knowledge {
         #[command(subcommand)]
         cmd: KnowledgeCmd,
+    },
+
+    /// Visualize / explore the knowledge graph (TUI + exporters)
+    Graph {
+        #[command(subcommand)]
+        cmd: GraphCmd,
     },
 
     /// Run code generation from schemas
@@ -181,6 +191,116 @@ enum KnowledgeCmd {
 
     /// Total live node count
     Count,
+
+    // ── meta-cognition ──────────────────────────────────────────────────────
+    /// Add or replace meta-cognition on an existing node
+    Meta {
+        node_id: String,
+        #[arg(long)]
+        certainty: Option<String>,
+        #[arg(long)]
+        assumption: Vec<String>,
+        #[arg(long = "counter")]
+        counter_argument: Vec<String>,
+        #[arg(long = "question")]
+        open_question: Vec<String>,
+        #[arg(long = "thought")]
+        thinking_step: Vec<String>,
+        #[arg(long, default_value = "0")]
+        derivation_depth: u32,
+        #[arg(long)]
+        confidence: Option<f64>,
+    },
+
+    /// List nodes whose `confidence` < threshold
+    LowConfidence {
+        #[arg(short, long, default_value = "0.5")]
+        threshold: f64,
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// List nodes carrying open meta-cognition questions
+    OpenQuestions {
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    // ── Lean 4 ──────────────────────────────────────────────────────────────
+    /// Create a `theorem` node from Lean source (file or stdin)
+    LeanCreate {
+        title: String,
+        /// Path to .lean file. Use '-' to read from stdin.
+        #[arg(short, long)]
+        file: String,
+    },
+
+    /// Verify a theorem node with the bundled stub Lean verifier
+    LeanVerify {
+        node_id: String,
+        /// Path to .lean file. If omitted, uses the node's body.
+        #[arg(short, long)]
+        file: Option<String>,
+        /// Use the external `lean` binary on PATH instead of the stub.
+        #[arg(long)]
+        external: bool,
+    },
+
+    /// List nodes by Lean proof status (verified|failed|pending|unknown)
+    LeanStatus {
+        status: String,
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    // ── reasoning ───────────────────────────────────────────────────────────
+    /// Find reasoning paths between two nodes (BFS, outgoing edges)
+    ReasonPath {
+        source: String,
+        target: String,
+        #[arg(short, long, default_value = "5")]
+        max_depth: usize,
+    },
+
+    /// Find evidence chains supporting a node
+    Evidence {
+        node_id: String,
+        #[arg(short, long, default_value = "5")]
+        max_depth: usize,
+    },
+
+    /// Detect contradictions in the graph
+    Contradictions {
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// Validate graph consistency (orphans, lean inconsistencies, etc.)
+    Validate,
+}
+
+#[derive(Subcommand)]
+enum GraphCmd {
+    /// Print headless dashboard stats as JSON
+    Dashboard,
+
+    /// Launch the interactive TUI
+    Tui,
+
+    /// Export the graph in a given format
+    Export {
+        /// One of: mermaid | dot | json
+        #[arg(short, long, default_value = "mermaid")]
+        format: String,
+        /// Optional root node — exports a walked subgraph from this node.
+        /// If omitted, exports the most recent N nodes.
+        #[arg(short, long)]
+        root: Option<String>,
+        #[arg(short, long, default_value = "2")]
+        depth: usize,
+        #[arg(short, long, default_value = "100")]
+        limit: usize,
+    },
 }
 
 fn init_tracing() {
@@ -382,6 +502,30 @@ fn open_knowledge_stack() -> anyhow::Result<(Arc<EventStore>, Arc<KnowledgeDb>, 
     Ok((store, db, service, repo))
 }
 
+fn open_full_stack() -> anyhow::Result<(KnowledgeService, KnowledgeRepository, CasStore)> {
+    let cfg = EventStoreConfig::from_dt_dir();
+    let mut store = EventStore::open(cfg.clone())?;
+    let db = Arc::new(KnowledgeDb::open(&cfg.db_path)?);
+    let projection = Arc::new(KnowledgeProjection::new(db.clone())?);
+    store.register_projection(projection);
+    let store = Arc::new(store);
+    let service = KnowledgeService::new(store, "local", "did:dt:local");
+    let repo = KnowledgeRepository::new(db);
+    let cas = CasStore::open(&cfg.cas_path)?;
+    Ok((service, repo, cas))
+}
+
+fn read_lean_source(file: &str) -> anyhow::Result<String> {
+    use std::io::Read;
+    if file == "-" {
+        let mut s = String::new();
+        std::io::stdin().read_to_string(&mut s)?;
+        Ok(s)
+    } else {
+        Ok(std::fs::read_to_string(file)?)
+    }
+}
+
 fn cmd_knowledge_create(node_type: &str, title: &str, body: &str) -> anyhow::Result<()> {
     let (_, _, svc, _) = open_knowledge_stack()?;
     let n = svc.create(NodeType::parse(node_type), NodeContent::new(title, body))?;
@@ -518,6 +662,246 @@ fn cmd_knowledge_neighbors(node_id: &str, direction: &str, limit: usize) -> anyh
 fn cmd_knowledge_count() -> anyhow::Result<()> {
     let (_, _, _, repo) = open_knowledge_stack()?;
     println!("{}", repo.count()?);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cmd_knowledge_meta(
+    node_id: &str,
+    certainty: Option<&str>,
+    assumption: Vec<String>,
+    counter_argument: Vec<String>,
+    open_question: Vec<String>,
+    thinking_step: Vec<String>,
+    derivation_depth: u32,
+    confidence: Option<f64>,
+) -> anyhow::Result<()> {
+    let (svc, _, _) = open_full_stack()?;
+    let mut mc = MetaCognition::new()
+        .with_derivation_depth(derivation_depth);
+    if let Some(c) = certainty {
+        mc = mc.with_certainty(CertaintyType::parse(c));
+    }
+    for a in assumption {
+        mc = mc.with_assumption(a);
+    }
+    for c in counter_argument {
+        mc = mc.with_counter_argument(c);
+    }
+    for q in open_question {
+        mc = mc.with_open_question(q);
+    }
+    for s in thinking_step {
+        mc = mc.with_thinking_step(ThinkingStep::now(s));
+    }
+    svc.set_meta_cognition(node_id, mc, confidence)?;
+    println!("{}", serde_json::json!({"ok": true, "node_id": node_id}));
+    Ok(())
+}
+
+fn cmd_knowledge_low_confidence(threshold: f64, limit: usize) -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    for n in repo.list_low_confidence(threshold, limit)? {
+        println!(
+            "{}\t{}\t{:?}\t{}",
+            n.node_id,
+            n.node_type.as_str(),
+            n.metadata.dt_confidence,
+            n.content.title
+        );
+    }
+    Ok(())
+}
+
+fn cmd_knowledge_open_questions(limit: usize) -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    for n in repo.list_with_open_questions(limit)? {
+        let qs = n
+            .meta_cognition
+            .as_ref()
+            .map(|m| m.open_questions.clone())
+            .unwrap_or_default();
+        println!(
+            "{}\t{}\t{}\t{}",
+            n.node_id,
+            n.node_type.as_str(),
+            qs.len(),
+            n.content.title
+        );
+        for q in qs {
+            println!("    ? {}", q);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_knowledge_lean_create(title: &str, file: &str) -> anyhow::Result<()> {
+    let src = read_lean_source(file)?;
+    let (svc, _, cas) = open_full_stack()?;
+    let n = svc.create_theorem(title, &src, &cas)?;
+    let lean = n.lean.unwrap();
+    println!(
+        "{}",
+        serde_json::json!({
+            "ok": true,
+            "node_id": n.node_id,
+            "lean_theorem_hash": lean.lean_theorem_hash,
+            "status": lean.lean_proof_status.as_str(),
+        })
+    );
+    Ok(())
+}
+
+fn cmd_knowledge_lean_verify(node_id: &str, file: Option<&str>, external: bool) -> anyhow::Result<()> {
+    let (svc, repo, cas) = open_full_stack()?;
+    let src = match file {
+        Some(f) => read_lean_source(f)?,
+        None => repo
+            .get(node_id)?
+            .map(|n| n.content.body)
+            .ok_or_else(|| anyhow::anyhow!("node not found"))?,
+    };
+
+    let stub = StubLeanVerifier::new();
+    let ext = ExternalLeanVerifier::new();
+    let verifier: &dyn LeanVerifier = if external { &ext } else { &stub };
+
+    let lean = svc.verify_with_lean(node_id, &src, verifier, &cas)?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "ok": lean.verified_by_lean,
+            "node_id": node_id,
+            "status": lean.lean_proof_status.as_str(),
+            "verifier": verifier.name(),
+            "diagnostics": lean.last_error,
+            "proof_hash": lean.lean_proof_hash,
+        })
+    );
+    Ok(())
+}
+
+fn cmd_knowledge_lean_status(status: &str, limit: usize) -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    for n in repo.list_by_lean_status(status, limit)? {
+        let lean = n.lean.unwrap_or_default();
+        println!(
+            "{}\t{}\t{}\t{}",
+            n.node_id,
+            lean.lean_proof_status.as_str(),
+            lean.verifier_version.unwrap_or_default(),
+            n.content.title
+        );
+    }
+    Ok(())
+}
+
+fn cmd_knowledge_reason_path(source: &str, target: &str, max_depth: usize) -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    let engine = ReasoningEngine::new(&repo);
+    let paths = engine.reason_path(source, target, max_depth, NeighborDirection::Outgoing)?;
+    if paths.is_empty() {
+        println!("{}", serde_json::json!({"paths": []}));
+        return Ok(());
+    }
+    for (i, p) in paths.iter().enumerate() {
+        println!(
+            "path #{} (depth={}, min_confidence={:?}):",
+            i, p.depth, p.min_confidence
+        );
+        for n in &p.nodes {
+            println!(
+                "  {} [{}] {}",
+                n.node_id,
+                n.node_type.as_str(),
+                n.content.title
+            );
+        }
+    }
+    Ok(())
+}
+
+fn cmd_knowledge_evidence(node_id: &str, max_depth: usize) -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    let engine = ReasoningEngine::new(&repo);
+    let chains = engine.find_evidence_chains(node_id, max_depth)?;
+    if chains.is_empty() {
+        println!("(no evidence chains)");
+        return Ok(());
+    }
+    for (i, c) in chains.iter().enumerate() {
+        println!("chain #{} (depth={}):", i, c.depth);
+        for n in &c.nodes {
+            println!(
+                "  {} [{}] {}",
+                n.node_id,
+                n.node_type.as_str(),
+                n.content.title
+            );
+        }
+    }
+    Ok(())
+}
+
+fn cmd_knowledge_contradictions(limit: usize) -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    let engine = ReasoningEngine::new(&repo);
+    let reports = engine.detect_contradictions(limit)?;
+    for r in reports {
+        println!(
+            "{}\t{}\t{}\t{}",
+            r.a.node_id, r.b.node_id, r.a.content.title, r.reason
+        );
+    }
+    Ok(())
+}
+
+fn cmd_knowledge_validate() -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    let engine = ReasoningEngine::new(&repo);
+    let issues = engine.validate_consistency()?;
+    if issues.is_empty() {
+        println!("{}", serde_json::json!({"ok": true, "issues": []}));
+    } else {
+        for i in &issues {
+            println!("{}", i);
+        }
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+fn cmd_graph_dashboard() -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    let stats = Dashboard::new(&repo).compute(10_000)?;
+    println!("{}", serde_json::to_string_pretty(&stats)?);
+    Ok(())
+}
+
+fn cmd_graph_tui() -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    dt_graph_ui::tui::run(&repo)?;
+    Ok(())
+}
+
+fn cmd_graph_export(
+    format: &str,
+    root: Option<&str>,
+    depth: usize,
+    limit: usize,
+) -> anyhow::Result<()> {
+    let (_, repo, _) = open_full_stack()?;
+    let scene = match root {
+        Some(r) => GraphScene::from_walk(&repo, r, depth, NeighborDirection::Both)?,
+        None => GraphScene::from_latest(&repo, limit)?,
+    };
+    let out = match format {
+        "mermaid" => scene.to_mermaid(),
+        "dot" | "graphviz" => scene.to_dot(),
+        "json" => scene.to_json()?,
+        other => anyhow::bail!("unknown format '{}'. use mermaid|dot|json", other),
+    };
+    println!("{}", out);
     Ok(())
 }
 

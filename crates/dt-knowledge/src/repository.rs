@@ -9,6 +9,8 @@ use dt_event::MetadataEnvelope;
 use crate::db::KnowledgeDb;
 use crate::edge::{KnowledgeEdge, Relation};
 use crate::error::KnowledgeError;
+use crate::lean::LeanVerification;
+use crate::meta_cognition::MetaCognition;
 use crate::node::{KnowledgeNode, NodeContent, NodeStatus, NodeType, Visibility};
 
 /// Direction filter for `neighbors`.
@@ -68,6 +70,62 @@ impl KnowledgeRepository {
                 "SELECT * FROM knowledge_nodes WHERE deleted = 0 ORDER BY modified_at DESC LIMIT ?1",
                 params![limit as i64],
             ),
+        })
+    }
+
+    /// Filter by `lean_proof_status` value (e.g. `"verified"`, `"failed"`,
+    /// `"pending"`). Returns nodes whose Lean verification matches.
+    pub fn list_by_lean_status(
+        &self,
+        status: &str,
+        limit: usize,
+    ) -> Result<Vec<KnowledgeNode>, KnowledgeError> {
+        self.db.with(|c| {
+            query_nodes_many(
+                c,
+                "SELECT * FROM knowledge_nodes
+                 WHERE deleted = 0
+                   AND json_extract(lean_verification_json, '$.lean_proof_status') = ?1
+                 ORDER BY modified_at DESC LIMIT ?2",
+                params![status, limit as i64],
+            )
+        })
+    }
+
+    /// Return all nodes whose `confidence` is below `threshold` — useful for
+    /// surfacing weak claims that may need verification.
+    pub fn list_low_confidence(
+        &self,
+        threshold: f64,
+        limit: usize,
+    ) -> Result<Vec<KnowledgeNode>, KnowledgeError> {
+        self.db.with(|c| {
+            query_nodes_many(
+                c,
+                "SELECT * FROM knowledge_nodes
+                 WHERE deleted = 0
+                   AND confidence IS NOT NULL
+                   AND confidence < ?1
+                 ORDER BY confidence ASC LIMIT ?2",
+                params![threshold, limit as i64],
+            )
+        })
+    }
+
+    /// Return all nodes whose meta-cognition has at least one open question.
+    pub fn list_with_open_questions(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<KnowledgeNode>, KnowledgeError> {
+        self.db.with(|c| {
+            query_nodes_many(
+                c,
+                "SELECT * FROM knowledge_nodes
+                 WHERE deleted = 0
+                   AND json_array_length(json_extract(meta_cognition_json, '$.open_questions')) > 0
+                 ORDER BY modified_at DESC LIMIT ?1",
+                params![limit as i64],
+            )
         })
     }
 
@@ -305,6 +363,18 @@ fn row_to_node(row: &rusqlite::Row) -> rusqlite::Result<KnowledgeNode> {
             .unwrap_or_else(|_| chrono::Utc::now())
     };
 
+    let meta_cognition_json: Option<String> = row.get("meta_cognition_json").ok();
+    let lean_json: Option<String> = row.get("lean_verification_json").ok();
+    let _confidence: Option<f64> = row.get("confidence").ok();
+
+    let meta_cognition: Option<MetaCognition> = meta_cognition_json
+        .as_deref()
+        .and_then(|s| serde_json::from_str::<MetaCognition>(s).ok());
+
+    let lean: Option<LeanVerification> = lean_json
+        .as_deref()
+        .and_then(|s| serde_json::from_str::<LeanVerification>(s).ok());
+
     Ok(KnowledgeNode {
         node_id,
         node_type: NodeType::parse(&node_type),
@@ -319,6 +389,8 @@ fn row_to_node(row: &rusqlite::Row) -> rusqlite::Result<KnowledgeNode> {
         visibility: Visibility::parse(&visibility),
         created_at: parse_dt(&created_at),
         modified_at: parse_dt(&modified_at),
+        meta_cognition,
+        lean,
     })
 }
 

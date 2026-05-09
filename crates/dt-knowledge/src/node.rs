@@ -8,6 +8,9 @@ use ulid::Ulid;
 
 use dt_event::MetadataEnvelope;
 
+use crate::lean::LeanVerification;
+use crate::meta_cognition::MetaCognition;
+
 /// Domain category of a knowledge node.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
@@ -27,6 +30,23 @@ pub enum NodeType {
     Habit,
     Goal,
     Metric,
+    // ── meta-cognition extensions ───────────────────────────────────────────
+    /// A reflective annotation on another node (the act of thinking *about* a
+    /// thought). Typically links via `Relation::References` to its subject.
+    Reflection,
+    /// A tentative claim awaiting verification or counter-evidence.
+    Hypothesis,
+    /// A synthesized conclusion derived from one or more hypotheses /
+    /// evidence chains.
+    Insight,
+    /// A recurring shape of reasoning (analogy, abstraction, decomposition).
+    CognitivePattern,
+    /// An open question the user wants the twin to keep alive.
+    MetaQuestion,
+    /// A formal statement that may be verified by an external prover (Lean 4).
+    Theorem,
+    /// Evidence supporting (or contradicting) a hypothesis or insight.
+    Evidence,
     /// Application-defined custom type.
     #[serde(untagged)]
     Custom(String),
@@ -50,6 +70,13 @@ impl NodeType {
             NodeType::Habit => "habit",
             NodeType::Goal => "goal",
             NodeType::Metric => "metric",
+            NodeType::Reflection => "reflection",
+            NodeType::Hypothesis => "hypothesis",
+            NodeType::Insight => "insight",
+            NodeType::CognitivePattern => "cognitive_pattern",
+            NodeType::MetaQuestion => "meta_question",
+            NodeType::Theorem => "theorem",
+            NodeType::Evidence => "evidence",
             NodeType::Custom(s) => s,
         }
     }
@@ -71,8 +98,29 @@ impl NodeType {
             "habit" => NodeType::Habit,
             "goal" => NodeType::Goal,
             "metric" => NodeType::Metric,
+            "reflection" => NodeType::Reflection,
+            "hypothesis" => NodeType::Hypothesis,
+            "insight" => NodeType::Insight,
+            "cognitive_pattern" => NodeType::CognitivePattern,
+            "meta_question" => NodeType::MetaQuestion,
+            "theorem" => NodeType::Theorem,
+            "evidence" => NodeType::Evidence,
             other => NodeType::Custom(other.to_string()),
         }
+    }
+
+    /// Whether this node type is part of the meta-cognition family.
+    pub fn is_meta_cognitive(&self) -> bool {
+        matches!(
+            self,
+            NodeType::Reflection
+                | NodeType::Hypothesis
+                | NodeType::Insight
+                | NodeType::CognitivePattern
+                | NodeType::MetaQuestion
+                | NodeType::Theorem
+                | NodeType::Evidence
+        )
     }
 }
 
@@ -166,6 +214,17 @@ pub struct KnowledgeNode {
     pub visibility: Visibility,
     pub created_at: DateTime<Utc>,
     pub modified_at: DateTime<Utc>,
+
+    /// Meta-cognitive annotation (thinking trace, assumptions, etc.).
+    /// `None` for ordinary nodes; populated for `reflection`, `hypothesis`,
+    /// `insight`, etc., or any node augmented via `add_meta_cognition`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meta_cognition: Option<MetaCognition>,
+
+    /// Lean 4 verification metadata. Populated when this node represents a
+    /// theorem or has been associated with a formal proof.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lean: Option<LeanVerification>,
 }
 
 impl KnowledgeNode {
@@ -186,6 +245,8 @@ impl KnowledgeNode {
             visibility: Visibility::Private,
             created_at: now,
             modified_at: now,
+            meta_cognition: None,
+            lean: None,
         }
     }
 

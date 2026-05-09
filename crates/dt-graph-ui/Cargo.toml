@@ -1,0 +1,26 @@
+[package]
+name = "dt-graph-ui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Terminal + headless UI for the DT knowledge graph (TUI via ratatui, plus Mermaid/DOT/JSON exporters)."
+
+[dependencies]
+dt-knowledge.workspace = true
+dt-event.workspace = true
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+
+ratatui = "0.26"
+crossterm = "0.27"
+
+[dev-dependencies]
+tempfile = "3.9"
+dt-core.workspace = true

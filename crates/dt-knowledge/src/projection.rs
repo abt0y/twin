@@ -18,10 +18,38 @@ pub struct KnowledgeProjection {
 }
 
 impl KnowledgeProjection {
-    /// Create a new projection. Ensures knowledge tables exist (idempotent).
+    /// Create a new projection. Ensures knowledge tables exist (idempotent)
+    /// and runs lightweight ALTER-TABLE migrations for meta-cognition columns.
     pub fn new(db: Arc<KnowledgeDb>) -> Result<Self, KnowledgeError> {
         db.execute_batch(KNOWLEDGE_SQL)?;
+        Self::ensure_meta_columns(&db)?;
         Ok(Self { db })
+    }
+
+    /// Add `meta_cognition_json`, `lean_verification_json`, `confidence`
+    /// columns if they don't already exist. Idempotent — `duplicate column
+    /// name` errors are swallowed.
+    fn ensure_meta_columns(db: &Arc<KnowledgeDb>) -> Result<(), KnowledgeError> {
+        let alters = [
+            "ALTER TABLE knowledge_nodes ADD COLUMN meta_cognition_json TEXT",
+            "ALTER TABLE knowledge_nodes ADD COLUMN lean_verification_json TEXT",
+            "ALTER TABLE knowledge_nodes ADD COLUMN confidence REAL",
+            "CREATE INDEX IF NOT EXISTS idx_knowledge_lean_status ON knowledge_nodes(json_extract(lean_verification_json, '$.lean_proof_status'))",
+            "CREATE INDEX IF NOT EXISTS idx_knowledge_confidence ON knowledge_nodes(confidence)",
+        ];
+        db.with(|conn| {
+            for sql in alters {
+                if let Err(e) = conn.execute(sql, []) {
+                    let msg = e.to_string();
+                    let benign = msg.contains("duplicate column name")
+                        || msg.contains("already exists");
+                    if !benign {
+                        return Err(KnowledgeError::Db(e));
+                    }
+                }
+            }
+            Ok(())
+        })
     }
 
     fn apply_create(conn: &Connection, ev: &Event) -> Result<(), EventError> {
@@ -81,6 +109,31 @@ impl KnowledgeProjection {
                 "UPDATE knowledge_nodes SET fts_synced = 1 WHERE node_id = ?1",
                 params![node_id],
             )?;
+
+            // Optional meta-cognition / Lean / confidence on create
+            let mc_json = p
+                .get("meta_cognition")
+                .map(serde_json::to_string)
+                .transpose()?;
+            let lean_json = p
+                .get("lean")
+                .map(serde_json::to_string)
+                .transpose()?;
+            let confidence = p
+                .get("confidence")
+                .and_then(|v| v.as_f64())
+                .or(ev.metadata.dt_confidence);
+
+            if mc_json.is_some() || lean_json.is_some() || confidence.is_some() {
+                conn.execute(
+                    "UPDATE knowledge_nodes
+                       SET meta_cognition_json = COALESCE(?1, meta_cognition_json),
+                           lean_verification_json = COALESCE(?2, lean_verification_json),
+                           confidence = COALESCE(?3, confidence)
+                     WHERE node_id = ?4",
+                    params![mc_json, lean_json, confidence, node_id],
+                )?;
+            }
             debug!(node_id, "knowledge.create projected");
         }
         Ok(())
@@ -137,6 +190,27 @@ impl KnowledgeProjection {
             conn.execute(
                 "UPDATE knowledge_nodes SET properties_json = ?1, modified_at = ?2 WHERE node_id = ?3",
                 params![s, now, node_id],
+            )?;
+        }
+        if let Some(mc) = p.get("meta_cognition") {
+            let s = serde_json::to_string(mc)?;
+            conn.execute(
+                "UPDATE knowledge_nodes SET meta_cognition_json = ?1, modified_at = ?2 WHERE node_id = ?3",
+                params![s, now, node_id],
+            )?;
+        }
+        if let Some(lean) = p.get("lean") {
+            let s = serde_json::to_string(lean)?;
+            conn.execute(
+                "UPDATE knowledge_nodes SET lean_verification_json = ?1, modified_at = ?2 WHERE node_id = ?3",
+                params![s, now, node_id],
+            )?;
+        }
+        if let Some(c) = p.get("confidence").and_then(|v| v.as_f64()) {
+            let clamped = c.clamp(0.0, 1.0);
+            conn.execute(
+                "UPDATE knowledge_nodes SET confidence = ?1, modified_at = ?2 WHERE node_id = ?3",
+                params![clamped, now, node_id],
             )?;
         }
         if new_title.is_some() || new_body.is_some() {
@@ -221,6 +295,63 @@ impl KnowledgeProjection {
         debug!(edge_id, "knowledge.unlink projected");
         Ok(())
     }
+
+    /// `knowledge.meta_cognition` — full replace of meta-cognition + optional confidence.
+    fn apply_meta_cognition(conn: &Connection, ev: &Event) -> Result<(), EventError> {
+        let p = &ev.payload;
+        let node_id = require_str(p, "node_id")?;
+        let now = ev.timestamp.to_rfc3339();
+
+        let mc = p
+            .get("meta_cognition")
+            .ok_or_else(|| EventError::Invalid("missing 'meta_cognition'".into()))?;
+        let mc_json = serde_json::to_string(mc)?;
+        conn.execute(
+            "UPDATE knowledge_nodes
+               SET meta_cognition_json = ?1, modified_at = ?2
+             WHERE node_id = ?3",
+            params![mc_json, now, node_id],
+        )?;
+        if let Some(c) = p.get("confidence").and_then(|v| v.as_f64()) {
+            let clamped = c.clamp(0.0, 1.0);
+            conn.execute(
+                "UPDATE knowledge_nodes SET confidence = ?1 WHERE node_id = ?2",
+                params![clamped, node_id],
+            )?;
+        }
+        debug!(node_id, "knowledge.meta_cognition projected");
+        Ok(())
+    }
+
+    /// `knowledge.lean.verified` / `knowledge.lean.failed` — update lean
+    /// verification metadata. The full `lean` JSON sub-object is stored.
+    fn apply_lean(
+        conn: &Connection,
+        ev: &Event,
+        verified: bool,
+    ) -> Result<(), EventError> {
+        let p = &ev.payload;
+        let node_id = require_str(p, "node_id")?;
+        let lean = p
+            .get("lean")
+            .ok_or_else(|| EventError::Invalid("missing 'lean' object".into()))?;
+        let lean_json = serde_json::to_string(lean)?;
+        let now = ev.timestamp.to_rfc3339();
+
+        conn.execute(
+            "UPDATE knowledge_nodes
+               SET lean_verification_json = ?1, modified_at = ?2
+             WHERE node_id = ?3",
+            params![lean_json, now, node_id],
+        )?;
+        debug!(
+            node_id,
+            verified,
+            "knowledge.lean.{} projected",
+            if verified { "verified" } else { "failed" }
+        );
+        Ok(())
+    }
 }
 
 impl Projection for KnowledgeProjection {
@@ -231,6 +362,15 @@ impl Projection for KnowledgeProjection {
             EventType::KnowledgeDelete => Self::apply_delete(conn, event).map_err(Into::into),
             EventType::KnowledgeLink => Self::apply_link(conn, event).map_err(Into::into),
             EventType::KnowledgeUnlink => Self::apply_unlink(conn, event).map_err(Into::into),
+            EventType::KnowledgeMetaCognition => {
+                Self::apply_meta_cognition(conn, event).map_err(Into::into)
+            }
+            EventType::KnowledgeLeanVerified => {
+                Self::apply_lean(conn, event, true).map_err(Into::into)
+            }
+            EventType::KnowledgeLeanFailed => {
+                Self::apply_lean(conn, event, false).map_err(Into::into)
+            }
             _ => Ok(()),
         });
         match result {

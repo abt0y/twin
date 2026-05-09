@@ -14,6 +14,7 @@ dt-core = { workspace = true }
 dt-db = { workspace = true }
 dt-event = { workspace = true }
 dt-knowledge = { workspace = true }
+dt-graph-ui = { workspace = true }
 dt-schema = { workspace = true }
 dt-codegen = { workspace = true }
 

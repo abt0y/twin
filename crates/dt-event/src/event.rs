@@ -30,6 +30,16 @@ pub enum EventType {
     KnowledgeLink,
     #[serde(rename = "knowledge.unlink")]
     KnowledgeUnlink,
+    /// A meta-cognition event (reflection, hypothesis, insight, etc.)
+    /// that annotates an existing knowledge node with thinking-trace data.
+    #[serde(rename = "knowledge.meta_cognition")]
+    KnowledgeMetaCognition,
+    /// The associated theorem was successfully verified by Lean 4.
+    #[serde(rename = "knowledge.lean.verified")]
+    KnowledgeLeanVerified,
+    /// The associated theorem failed Lean 4 verification.
+    #[serde(rename = "knowledge.lean.failed")]
+    KnowledgeLeanFailed,
     #[serde(rename = "agent.action")]
     AgentAction,
     #[serde(rename = "agent.observation")]
@@ -61,6 +71,9 @@ impl fmt::Display for EventType {
             EventType::KnowledgeDelete => "knowledge.delete",
             EventType::KnowledgeLink => "knowledge.link",
             EventType::KnowledgeUnlink => "knowledge.unlink",
+            EventType::KnowledgeMetaCognition => "knowledge.meta_cognition",
+            EventType::KnowledgeLeanVerified => "knowledge.lean.verified",
+            EventType::KnowledgeLeanFailed => "knowledge.lean.failed",
             EventType::AgentAction => "agent.action",
             EventType::AgentObservation => "agent.observation",
             EventType::SyncDelta => "sync.delta",

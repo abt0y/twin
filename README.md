@@ -37,7 +37,8 @@ A **production-grade, local-first, AI-native Digital Twin** platform.
 |---------------|----------------------------------------------------------------|
 | `dt-core`     | Shared types, CAS storage, crypto (SHA3-256, Blake3), ULID/UUID|
 | `dt-db`       | SQLite layer: events, knowledge nodes, FTS5, embeddings, vss   |
-| `dt-event`    | **Append-only event sourcing engine** (see below)              |
+| `dt-event`    | Append-only event sourcing engine                              |
+| `dt-knowledge`| **Knowledge graph API** — projection over the event log        |
 | `dt-sync`     | Hybrid vector clocks + CRDT primitives (LWW, OR-Set) + delta   |
 | `dt-schema`   | Schema registry, JSON Schema validation                        |
 | `dt-codegen`  | Codegen → Rust / Python / TypeScript from schemas              |
@@ -145,6 +146,46 @@ let m = MetadataEnvelope::builder("did:dt:alice", "1.0.0")
 
 ---
 
+## Knowledge Graph API (`dt-knowledge`)
+
+The user-facing knowledge graph, **projected from the event log**. All writes
+flow through `KnowledgeService` → `EventStore` → `KnowledgeProjection` → SQLite.
+
+```rust
+use std::sync::Arc;
+use dt_event::{EventStore, EventStoreConfig};
+use dt_knowledge::{
+    service::NodePatch, KnowledgeDb, KnowledgeProjection, KnowledgeRepository,
+    KnowledgeService, NeighborDirection, NodeContent, NodeType, Relation,
+};
+
+// Wire the stack
+let cfg = EventStoreConfig::from_dt_dir();
+let mut store = EventStore::open(cfg.clone())?;
+let db = Arc::new(KnowledgeDb::open(&cfg.db_path)?);
+store.register_projection(Arc::new(KnowledgeProjection::new(db.clone())?));
+let store = Arc::new(store);
+let svc = KnowledgeService::new(store, "node-alpha", "did:dt:alice");
+let repo = KnowledgeRepository::new(db);
+
+// Write
+let n = svc.create(NodeType::Note, NodeContent::new("Hello", "Markdown body"))?;
+svc.update(&n.node_id, NodePatch { title: Some("Hi".into()), ..Default::default() })?;
+let edge = svc.link(&n.node_id, &other.node_id, Relation::References, Some(0.8))?;
+
+// Read
+let hits = repo.search("rust async", 10)?;
+let neighbors = repo.neighbors(&n.node_id, NeighborDirection::Both, None, 50)?;
+let subgraph = repo.walk(&n.node_id, 2, NeighborDirection::Outgoing)?;
+```
+
+### Why route writes through events?
+- **Single source of truth.** SQLite tables are a *cache*. The truth is the log.
+- **Audit + replay.** Rebuilding state == replaying events.
+- **Sync-ready.** Events are the wire format for mesh sync.
+
+---
+
 ## CLI Quickstart
 
 ```bash
@@ -174,6 +215,15 @@ cargo build -p dt-cli
 
 # Verify the entire log (recomputes every hash + chain link)
 ./target/debug/dt event verify
+
+# Knowledge graph
+./target/debug/dt knowledge create -t note -T "Rust async" -b "tokio runtime"
+./target/debug/dt knowledge create -t task -T "Read book" -b "Karpathy nano-gpt"
+./target/debug/dt knowledge list -t note
+./target/debug/dt knowledge search "rust"
+./target/debug/dt knowledge link <source-id> <target-id> -r related_to
+./target/debug/dt knowledge neighbors <node-id>
+./target/debug/dt knowledge count
 
 # Status
 ./target/debug/dt status
@@ -216,17 +266,18 @@ cargo test -p dt-event
 cargo test -p dt-event --test integration
 ```
 
-**Current status:** 64 tests passing across 8 crates.
+**Current status:** 80 tests passing across 9 crates.
 
-| Crate        | Unit | Integration |
-|--------------|-----:|------------:|
-| dt-core      |    9 |           – |
-| dt-db        |    7 |           – |
-| dt-event     |   33 |           4 |
-| dt-sync      |    6 |           – |
-| dt-schema    |    4 |           – |
-| dt-codegen   |    1 |           – |
-| dt-agent     |    1 |           – |
+| Crate         | Unit | Integration |
+|---------------|-----:|------------:|
+| dt-core       |    9 |           – |
+| dt-db         |    7 |           – |
+| dt-event      |   33 |           4 |
+| dt-knowledge  |    7 |           8 |
+| dt-sync       |    6 |           – |
+| dt-schema     |    4 |           – |
+| dt-codegen    |    1 |           – |
+| dt-agent      |    1 |           – |
 
 ---
 
@@ -245,8 +296,8 @@ cargo test -p dt-event --test integration
 - [x] Workspace skeleton + schema registry
 - [x] CAS storage (`dt-core::cas`)
 - [x] SQLite layer with FTS5 + vector tables (`dt-db`)
-- [x] **Append-only event sourcing engine (`dt-event`)** ← *just shipped*
-- [ ] Knowledge Graph API (CRUD + edges + FTS, projects from events)
+- [x] Append-only event sourcing engine (`dt-event`)
+- [x] **Knowledge Graph API (`dt-knowledge`) — CRUD, FTS5, edges, walk** ← *just shipped*
 - [ ] Sync engine: QUIC transport + delta protocol
 - [ ] Agent IPC daemon (`dtd`) with WASM sandbox
 - [ ] Schema-driven SQL migration codegen
