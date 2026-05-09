@@ -971,6 +971,56 @@ fn main() -> anyhow::Result<()> {
                 cmd_knowledge_neighbors(&node_id, &direction, limit)
             }
             KnowledgeCmd::Count => cmd_knowledge_count(),
+            KnowledgeCmd::Meta {
+                node_id,
+                certainty,
+                assumption,
+                counter_argument,
+                open_question,
+                thinking_step,
+                derivation_depth,
+                confidence,
+            } => cmd_knowledge_meta(
+                &node_id,
+                certainty.as_deref(),
+                assumption,
+                counter_argument,
+                open_question,
+                thinking_step,
+                derivation_depth,
+                confidence,
+            ),
+            KnowledgeCmd::LowConfidence { threshold, limit } => {
+                cmd_knowledge_low_confidence(threshold, limit)
+            }
+            KnowledgeCmd::OpenQuestions { limit } => cmd_knowledge_open_questions(limit),
+            KnowledgeCmd::LeanCreate { title, file } => cmd_knowledge_lean_create(&title, &file),
+            KnowledgeCmd::LeanVerify {
+                node_id,
+                file,
+                external,
+            } => cmd_knowledge_lean_verify(&node_id, file.as_deref(), external),
+            KnowledgeCmd::LeanStatus { status, limit } => cmd_knowledge_lean_status(&status, limit),
+            KnowledgeCmd::ReasonPath {
+                source,
+                target,
+                max_depth,
+            } => cmd_knowledge_reason_path(&source, &target, max_depth),
+            KnowledgeCmd::Evidence { node_id, max_depth } => {
+                cmd_knowledge_evidence(&node_id, max_depth)
+            }
+            KnowledgeCmd::Contradictions { limit } => cmd_knowledge_contradictions(limit),
+            KnowledgeCmd::Validate => cmd_knowledge_validate(),
+        },
+        Commands::Graph { cmd } => match cmd {
+            GraphCmd::Dashboard => cmd_graph_dashboard(),
+            GraphCmd::Tui => cmd_graph_tui(),
+            GraphCmd::Export {
+                format,
+                root,
+                depth,
+                limit,
+            } => cmd_graph_export(&format, root.as_deref(), depth, limit),
         },
         Commands::Generate { target } => cmd_generate(target),
         Commands::ValidateSchemas => cmd_validate_schemas(),

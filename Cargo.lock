@@ -383,6 +383,7 @@ dependencies = [
  "dt-core",
  "dt-db",
  "dt-event",
+ "dt-graph-ui",
  "dt-knowledge",
  "dt-schema",
  "serde_json",

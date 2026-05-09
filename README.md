@@ -39,6 +39,7 @@ A **production-grade, local-first, AI-native Digital Twin** platform.
 | `dt-db`       | SQLite layer: events, knowledge nodes, FTS5, embeddings, vss   |
 | `dt-event`    | Append-only event sourcing engine                              |
 | `dt-knowledge`| **Knowledge graph API** — projection over the event log        |
+| `dt-graph-ui` | Terminal UI + headless dashboard + graph exporters (Mermaid/DOT/JSON) |
 | `dt-sync`     | Hybrid vector clocks + CRDT primitives (LWW, OR-Set) + delta   |
 | `dt-schema`   | Schema registry, JSON Schema validation                        |
 | `dt-codegen`  | Codegen → Rust / Python / TypeScript from schemas              |
@@ -184,6 +185,17 @@ let subgraph = repo.walk(&n.node_id, 2, NeighborDirection::Outgoing)?;
 - **Audit + replay.** Rebuilding state == replaying events.
 - **Sync-ready.** Events are the wire format for mesh sync.
 
+### Meta-Cognition & Lean 4 Verification
+
+`dt-knowledge` now supports **cognitive graph queries** and **formal verification**:
+
+- **Meta-cognition nodes**: Evidence, Hypothesis, Insight, Reflection, Theorem, CognitivePattern, MetaQuestion
+- **MetaCognition envelope**: confidence scores, certainty types (heuristic/statistical/proof), thinking traces, assumptions, counter-arguments, open questions, derivation depth
+- **Lean 4 integration**: theorem nodes with CAS-stored source, proof status tracking (verified/failed/pending), verifier metadata
+- **Reasoning engine**: multi-hop BFS path queries, evidence chain discovery, contradiction detection, consistency validation
+- **Export formats**: Mermaid, Graphviz DOT, JSON
+- **Terminal UI**: interactive ratatui dashboard with filtering by type, confidence, and Lean status
+
 ---
 
 ## CLI Quickstart
@@ -224,6 +236,27 @@ cargo build -p dt-cli
 ./target/debug/dt knowledge link <source-id> <target-id> -r related_to
 ./target/debug/dt knowledge neighbors <node-id>
 ./target/debug/dt knowledge count
+
+# Meta-cognition
+./target/debug/dt knowledge meta <node-id> --certainty heuristic --assumption "users hate latency" --confidence 0.6
+./target/debug/dt knowledge low-confidence --threshold 0.5
+./target/debug/dt knowledge open-questions
+
+# Lean 4 verification
+./target/debug/dt knowledge lean-create "add_comm" -f theorem.lean
+./target/debug/dt knowledge lean-verify <node-id> --external
+./target/debug/dt knowledge lean-status verified
+
+# Reasoning
+./target/debug/dt knowledge reason-path <source> <target> --max-depth 5
+./target/debug/dt knowledge evidence <node-id> --max-depth 5
+./target/debug/dt knowledge contradictions
+./target/debug/dt knowledge validate
+
+# Graph UI
+./target/debug/dt graph dashboard  # JSON stats
+./target/debug/dt graph tui        # interactive terminal UI
+./target/debug/dt graph export --format mermaid --root <node-id> --depth 3
 
 # Status
 ./target/debug/dt status
@@ -266,14 +299,15 @@ cargo test -p dt-event
 cargo test -p dt-event --test integration
 ```
 
-**Current status:** 80 tests passing across 9 crates.
+**Current status:** 115 tests passing across 10 crates.
 
 | Crate         | Unit | Integration |
 |---------------|-----:|------------:|
 | dt-core       |    9 |           – |
 | dt-db         |    7 |           – |
 | dt-event      |   33 |           4 |
-| dt-knowledge  |    7 |           8 |
+| dt-knowledge  |   37 |          26 |
+| dt-graph-ui   |    3 |           1 |
 | dt-sync       |    6 |           – |
 | dt-schema     |    4 |           – |
 | dt-codegen    |    1 |           – |
@@ -297,7 +331,9 @@ cargo test -p dt-event --test integration
 - [x] CAS storage (`dt-core::cas`)
 - [x] SQLite layer with FTS5 + vector tables (`dt-db`)
 - [x] Append-only event sourcing engine (`dt-event`)
-- [x] **Knowledge Graph API (`dt-knowledge`) — CRUD, FTS5, edges, walk** ← *just shipped*
+- [x] **Knowledge Graph API (`dt-knowledge`) — CRUD, FTS5, edges, walk**
+- [x] **Meta-cognition + Lean 4 verification integration** ← *just shipped*
+- [x] **Reasoning engine + graph exporters (Mermaid/DOT/JSON) + TUI** ← *just shipped*
 - [ ] Sync engine: QUIC transport + delta protocol
 - [ ] Agent IPC daemon (`dtd`) with WASM sandbox
 - [ ] Schema-driven SQL migration codegen
