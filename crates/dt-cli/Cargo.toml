@@ -1,0 +1,24 @@
+[package]
+name = "dt-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "dt"
+path = "src/main.rs"
+
+[dependencies]
+dt-core = { workspace = true }
+dt-db = { workspace = true }
+dt-event = { workspace = true }
+dt-schema = { workspace = true }
+dt-codegen = { workspace = true }
+
+clap = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+serde_json = { workspace = true }

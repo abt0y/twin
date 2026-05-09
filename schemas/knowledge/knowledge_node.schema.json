@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dt.platform/schemas/knowledge_node/1.0.0",
+  "title": "KnowledgeNode",
+  "description": "A node in the knowledge graph. Primary unit of user-facing data.",
+  "type": "object",
+  "required": ["node_id", "node_type", "content", "metadata"],
+  "properties": {
+    "node_id": { "type": "string", "description": "ULID unique identifier" },
+    "node_type": {
+      "type": "string",
+      "enum": [
+        "note", "task", "project", "person", "organization",
+        "document", "media", "link", "concept", "agent",
+        "event", "reminder", "habit", "goal", "metric"
+      ]
+    },
+    "content": {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "type": "string", "maxLength": 2048 },
+        "body": { "type": "string", "description": "Markdown body with YAML frontmatter allowed inline" },
+        "abstract": { "type": "string", "maxLength": 4096 }
+      }
+    },
+    "properties": {
+      "type": "object",
+      "description": "Arbitrary key-value properties (validated against node_type schema)",
+      "additionalProperties": true
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["edge_id", "target_id", "relation"],
+        "properties": {
+          "edge_id": { "type": "string" },
+          "target_id": { "type": "string" },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "parent_of", "child_of", "references", "related_to",
+              "depends_on", "blocks", "created_by", "mentions",
+              "tagged_with", "located_at", "occurred_at"
+            ]
+          },
+          "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+          "metadata": { "$ref": "/schemas/common/metadata_envelope.schema.json" }
+        }
+      }
+    },
+    "metadata": { "$ref": "/schemas/common/metadata_envelope.schema.json" },
+    "status": {
+      "type": "string",
+      "enum": ["active", "archived", "deleted", "draft", "pending"],
+      "default": "active"
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["private", "shared", "public"],
+      "default": "private"
+    }
+  }
+}

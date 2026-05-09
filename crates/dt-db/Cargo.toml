@@ -1,0 +1,22 @@
+[package]
+name = "dt-db"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+dt-core = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+ulid = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+rusqlite = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.9"
+tokio = { workspace = true }

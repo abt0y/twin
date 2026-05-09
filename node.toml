@@ -1,0 +1,67 @@
+# DT Platform Node Configuration
+# Every node (device) is sovereign. This file defines node-level invariants.
+
+[node]
+node_id = ""
+node_name = ""
+created_at = ""
+version = "0.1.0"
+
+[paths]
+# All paths are relative to $HOME or absolute. Default: ~/.dt/
+data_dir = "~/.dt"
+events = "events"
+knowledge = "knowledge"
+cas = "cas"
+config = "config"
+schemas = "schemas"
+agents = "agents"
+logs = "logs"
+mesh = "mesh"
+sync = "sync"
+tmp = "tmp"
+backups = "backups"
+
+[sync]
+enabled = true
+mode = "delta"  # "delta", "full", "hybrid"
+compression = "zstd"
+quic_listen = "0.0.0.0:4433"
+known_peers = []
+max_sync_interval_ms = 30000
+min_sync_interval_ms = 5000
+vector_clock_strategy = "hybrid-crdt"
+
+[database]
+engine = "sqlite"
+path = "~/.dt/db.sqlite"
+extensions = ["fts5", "json1", "uuid", "vss"]
+page_size = 4096
+journal_mode = "wal"
+synchronous = "normal"
+mmap_size = 268435456  # 256MB
+
+[database.embeddings]
+provider = "ollama"
+model = "nomic-embed-text"
+dimensions = 768
+batch_size = 32
+
+[agents]
+enabled = true
+ipc_socket = "~/.dt/agents/bus.sock"
+max_agents = 16
+allowed_runtimes = [".claude", ".gemini", ".local"]
+sandbox = "wasm"
+
+[security]
+identity_method = "did:w3c"
+key_store = "~/.dt/config/keys"
+encryption_at_rest = true
+cas_hash = "sha3-256"
+
+[observability]
+log_format = "jsonl"
+log_level = "info"
+structured_events = true
+metrics_enabled = true

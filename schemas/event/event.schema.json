@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dt.platform/schemas/event/1.0.0",
+  "title": "Event",
+  "description": "Append-only event — the single source of truth in DT Platform.",
+  "type": "object",
+  "required": ["event_id", "event_type", "timestamp", "payload", "vector_clock", "metadata"],
+  "properties": {
+    "event_id": { "type": "string", "description": "ULID — lexicographically sortable, unique" },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "knowledge.create", "knowledge.update", "knowledge.delete",
+        "knowledge.link", "knowledge.unlink",
+        "agent.action", "agent.observation",
+        "sync.delta", "sync.full", "sync.merge",
+        "system.config_change", "system.schema_update",
+        "user.auth", "user.session"
+      ]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "node_id": { "type": "string", "description": "Source node that emitted this event" },
+    "user_id": { "type": "string", "description": "DID of the acting user (if applicable)" },
+    "payload": {
+      "type": "object",
+      "description": "Event-specific payload — schema validated at runtime"
+    },
+    "payload_schema_hash": { "type": "string", "description": "SHA3-256 of the payload schema" },
+    "vector_clock": { "$ref": "/schemas/common/vector_clock.schema.json" },
+    "prev_event_id": { "type": "string", "description": "Previous event in this causal chain" },
+    "causal_deps": { "type": "array", "items": { "type": "string" }, "description": "Event IDs this event depends on" },
+    "metadata": { "$ref": "/schemas/common/metadata_envelope.schema.json" },
+    "signature": { "type": "string", "description": "Ed25519 signature of canonical event bytes" },
+    "content_hash": { "type": "string", "description": "SHA3-256 of canonical event JSON" }
+  }
+}

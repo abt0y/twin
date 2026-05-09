@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dt.platform/schemas/vector_clock/1.0.0",
+  "title": "VectorClock",
+  "description": "Hybrid vector clock for distributed ordering and sync.",
+  "type": "object",
+  "required": ["node_id", "counters"],
+  "properties": {
+    "node_id": { "type": "string", "description": "The node this vector clock belongs to" },
+    "counters": {
+      "type": "object",
+      "description": "Map of node_id -> logical counter",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "timestamp": { "type": "string", "format": "date-time", "description": "Physical wall-clock timestamp" },
+    "hybrid_lamport": { "type": "integer", "minimum": 0, "description": "Optional Lamport logical clock for total ordering" }
+  }
+}

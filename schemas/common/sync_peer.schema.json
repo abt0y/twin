@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dt.platform/schemas/sync_peer/1.0.0",
+  "title": "SyncPeer",
+  "description": "Peer descriptor for mesh sync topology.",
+  "type": "object",
+  "required": ["peer_id", "did", "public_key"],
+  "properties": {
+    "peer_id": { "type": "string", "description": "Unique peer identifier (ULID)" },
+    "did": { "type": "string", "description": "W3C Decentralized Identifier" },
+    "public_key": { "type": "string", "description": "Base64-encoded Ed25519 public key" },
+    "endpoint": { "type": "string", "description": "QUIC endpoint address" },
+    "last_seen": { "type": "string", "format": "date-time" },
+    "vector_clock": { "$ref": "/schemas/common/vector_clock.schema.json" },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "trust_score": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}

@@ -1,0 +1,14 @@
+/home/b/CascadeProjects/windsurf-project/target/debug/deps/serde_cbor-64dbd7b8a682ebfc.d: /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/lib.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/de.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/error.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/read.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/ser.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/tags.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/write.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/value/mod.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/value/de.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/value/ser.rs
+
+/home/b/CascadeProjects/windsurf-project/target/debug/deps/libserde_cbor-64dbd7b8a682ebfc.rmeta: /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/lib.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/de.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/error.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/read.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/ser.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/tags.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/write.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/value/mod.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/value/de.rs /home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/value/ser.rs
+
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/lib.rs:
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/de.rs:
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/error.rs:
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/read.rs:
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/ser.rs:
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/tags.rs:
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/write.rs:
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/value/mod.rs:
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/value/de.rs:
+/home/b/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_cbor-0.11.2/src/value/ser.rs:

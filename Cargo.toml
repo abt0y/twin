@@ -1,0 +1,70 @@
+[workspace]
+members = [
+    "crates/dt-core",
+    "crates/dt-db",
+    "crates/dt-event",
+    "crates/dt-sync",
+    "crates/dt-schema",
+    "crates/dt-codegen",
+    "crates/dt-agent",
+    "crates/dt-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["DT Platform Contributors"]
+license = "MIT"
+repository = "https://github.com/dt-platform/dt"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Core async + runtime
+tokio = { version = "1.35", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_cbor = "0.11"
+toml = "0.8"
+
+# Crypto + hashing
+sha3 = "0.10"
+ring = "0.17"
+blake3 = "1.5"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+ulid = { version = "1.1", features = ["serde"] }
+
+# DB
+rusqlite = { version = "0.30", features = ["bundled", "backup", "collation", "serde_json", "hooks", "load_extension"] }
+libduckdb-sys = { version = "0.9" }
+duckdb = { version = "0.9" }
+
+# IPC + networking
+quinn = "0.10"
+ipc-channel = "0.18"
+
+# Misc
+thiserror = "1.0"
+anyhow = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+dirs = "5.0"
+walkdir = "2.4"
+hex = "0.4"
+base64 = "0.21"
+
+# Internal (versioned together)
+dt-core = { path = "crates/dt-core" }
+dt-db = { path = "crates/dt-db" }
+dt-sync = { path = "crates/dt-sync" }
+dt-schema = { path = "crates/dt-schema" }
+dt-codegen = { path = "crates/dt-codegen" }
+dt-agent = { path = "crates/dt-agent" }
+dt-event = { path = "crates/dt-event" }
+
+uuid = { version = "1.7", features = ["v7", "serde"] }

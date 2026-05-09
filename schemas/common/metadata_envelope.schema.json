@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dt.platform/schemas/metadata_envelope/1.0.0",
+  "title": "MetadataEnvelope",
+  "description": "Rich metadata envelope attached to every object in the system.",
+  "type": "object",
+  "required": ["dt_id", "dt_version", "dt_created_at", "dt_schema_version", "dt_owner"],
+  "properties": {
+    "dt_id": { "type": "string", "format": "uuid", "description": "Unique object identifier" },
+    "dt_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "description": "Semantic version of this object instance" },
+    "dt_created_at": { "type": "string", "format": "date-time", "description": "UTC creation timestamp" },
+    "dt_modified_at": { "type": "string", "format": "date-time", "description": "UTC last-modified timestamp" },
+    "dt_schema_version": { "type": "string", "description": "Schema version used to validate this object" },
+    "dt_schema_hash": { "type": "string", "description": "SHA3-256 hash of the schema definition" },
+    "dt_owner": { "type": "string", "description": "DID of the node/user that owns this object" },
+    "dt_source_node": { "type": "string", "description": "Node ID that originally created this object" },
+    "dt_lineage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "event_id": { "type": "string" },
+          "event_type": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "node_id": { "type": "string" }
+        }
+      },
+      "description": "Provenance chain of events that produced this object"
+    },
+    "dt_tags": { "type": "array", "items": { "type": "string" }, "description": "User-defined tags" },
+    "dt_confidence": { "type": "number", "minimum": 0, "maximum": 1, "description": "Confidence score for AI-generated content" },
+    "dt_embeddings": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" },
+        "dimensions": { "type": "integer" },
+        "vector_b64": { "type": "string", "description": "Base64-encoded embedding vector" }
+      }
+    }
+  }
+}
