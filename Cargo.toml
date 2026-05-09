@@ -3,6 +3,7 @@ members = [
     "crates/dt-core",
     "crates/dt-db",
     "crates/dt-event",
+    "crates/dt-knowledge",
     "crates/dt-sync",
     "crates/dt-schema",
     "crates/dt-codegen",
@@ -66,5 +67,6 @@ dt-schema = { path = "crates/dt-schema" }
 dt-codegen = { path = "crates/dt-codegen" }
 dt-agent = { path = "crates/dt-agent" }
 dt-event = { path = "crates/dt-event" }
+dt-knowledge = { path = "crates/dt-knowledge" }
 
 uuid = { version = "1.7", features = ["v7", "serde"] }

@@ -330,6 +330,7 @@ dependencies = [
  "dt-core",
  "dt-db",
  "dt-event",
+ "dt-knowledge",
  "dt-schema",
  "serde_json",
  "tokio",
@@ -408,6 +409,27 @@ dependencies = [
  "tracing",
  "ulid",
  "uuid",
+]
+
+[[package]]
+name = "dt-knowledge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dt-core",
+ "dt-db",
+ "dt-event",
+ "dt-sync",
+ "hex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha3",
+ "tempfile",
+ "thiserror",
+ "tracing",
+ "ulid",
 ]
 
 [[package]]

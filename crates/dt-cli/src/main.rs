@@ -5,8 +5,14 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use std::sync::Arc;
+
 use dt_event::{
     Event, EventBuilder, EventStore, EventStoreConfig, EventType, MetadataEnvelope,
+};
+use dt_knowledge::{
+    service::NodePatch, KnowledgeDb, KnowledgeProjection, KnowledgeRepository, KnowledgeService,
+    NeighborDirection, NodeContent, NodeStatus, NodeType, Relation,
 };
 
 #[derive(Parser)]
@@ -35,6 +41,12 @@ enum Commands {
     Event {
         #[command(subcommand)]
         cmd: EventCmd,
+    },
+
+    /// Manage the knowledge graph
+    Knowledge {
+        #[command(subcommand)]
+        cmd: KnowledgeCmd,
     },
 
     /// Run code generation from schemas
@@ -95,6 +107,79 @@ enum EventCmd {
     Verify,
 
     /// Show total event count
+    Count,
+}
+
+#[derive(Subcommand)]
+enum KnowledgeCmd {
+    /// Create a new knowledge node
+    Create {
+        /// Node type (note|task|project|person|concept|...)
+        #[arg(short = 't', long, default_value = "note")]
+        node_type: String,
+        /// Title
+        #[arg(short = 'T', long)]
+        title: String,
+        /// Body (Markdown)
+        #[arg(short, long, default_value = "")]
+        body: String,
+    },
+
+    /// Get a node by id
+    Get { node_id: String },
+
+    /// List recent nodes
+    List {
+        #[arg(short = 't', long)]
+        node_type: Option<String>,
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// Full-text search the knowledge graph
+    Search {
+        query: String,
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// Patch an existing node
+    Update {
+        node_id: String,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long)]
+        body: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+    },
+
+    /// Soft-delete a node
+    Delete { node_id: String },
+
+    /// Link two nodes
+    Link {
+        source: String,
+        target: String,
+        #[arg(short, long, default_value = "related_to")]
+        relation: String,
+        #[arg(short, long)]
+        weight: Option<f64>,
+    },
+
+    /// Unlink (soft-delete an edge)
+    Unlink { edge_id: String },
+
+    /// List neighbors of a node
+    Neighbors {
+        node_id: String,
+        #[arg(short, long, default_value = "both")]
+        direction: String,
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// Total live node count
     Count,
 }
 
@@ -284,6 +369,157 @@ fn cmd_validate_schemas() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn open_knowledge_stack() -> anyhow::Result<(Arc<EventStore>, Arc<KnowledgeDb>, KnowledgeService, KnowledgeRepository)> {
+    let cfg = EventStoreConfig::from_dt_dir();
+    let mut store = EventStore::open(cfg.clone())?;
+    let db = Arc::new(KnowledgeDb::open(&cfg.db_path)?);
+    let projection = Arc::new(KnowledgeProjection::new(db.clone())?);
+    store.register_projection(projection);
+    let store = Arc::new(store);
+    let service = KnowledgeService::new(store.clone(), "local", "did:dt:local");
+    let repo = KnowledgeRepository::new(db.clone());
+    Ok((store, db, service, repo))
+}
+
+fn cmd_knowledge_create(node_type: &str, title: &str, body: &str) -> anyhow::Result<()> {
+    let (_, _, svc, _) = open_knowledge_stack()?;
+    let n = svc.create(NodeType::parse(node_type), NodeContent::new(title, body))?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "ok": true,
+            "node_id": n.node_id,
+            "node_type": n.node_type.as_str(),
+            "title": n.content.title,
+        })
+    );
+    Ok(())
+}
+
+fn cmd_knowledge_get(node_id: &str) -> anyhow::Result<()> {
+    let (_, _, _, repo) = open_knowledge_stack()?;
+    match repo.get(node_id)? {
+        Some(n) => {
+            println!("{}", serde_json::to_string_pretty(&n)?);
+            Ok(())
+        }
+        None => {
+            eprintln!("not found: {}", node_id);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn cmd_knowledge_list(node_type: Option<&str>, limit: usize) -> anyhow::Result<()> {
+    let (_, _, _, repo) = open_knowledge_stack()?;
+    let nt = node_type.map(NodeType::parse);
+    let nodes = repo.list(nt.as_ref(), limit)?;
+    for n in nodes {
+        println!(
+            "{}\t{}\t{}\t{}",
+            n.node_id,
+            n.node_type.as_str(),
+            n.status.as_str(),
+            n.content.title
+        );
+    }
+    Ok(())
+}
+
+fn cmd_knowledge_search(query: &str, limit: usize) -> anyhow::Result<()> {
+    let (_, _, _, repo) = open_knowledge_stack()?;
+    let nodes = repo.search(query, limit)?;
+    for n in nodes {
+        println!(
+            "{}\t{}\t{}",
+            n.node_id,
+            n.node_type.as_str(),
+            n.content.title
+        );
+    }
+    Ok(())
+}
+
+fn cmd_knowledge_update(
+    node_id: &str,
+    title: Option<&str>,
+    body: Option<&str>,
+    status: Option<&str>,
+) -> anyhow::Result<()> {
+    let (_, _, svc, _) = open_knowledge_stack()?;
+    let patch = NodePatch {
+        title: title.map(String::from),
+        body: body.map(String::from),
+        status: status.map(NodeStatus::parse),
+        ..Default::default()
+    };
+    svc.update(node_id, patch)?;
+    println!("{}", serde_json::json!({"ok": true, "node_id": node_id}));
+    Ok(())
+}
+
+fn cmd_knowledge_delete(node_id: &str) -> anyhow::Result<()> {
+    let (_, _, svc, _) = open_knowledge_stack()?;
+    svc.delete(node_id)?;
+    println!("{}", serde_json::json!({"ok": true, "node_id": node_id}));
+    Ok(())
+}
+
+fn cmd_knowledge_link(
+    source: &str,
+    target: &str,
+    relation: &str,
+    weight: Option<f64>,
+) -> anyhow::Result<()> {
+    let (_, _, svc, _) = open_knowledge_stack()?;
+    let edge = svc.link(source, target, Relation::parse(relation), weight)?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "ok": true,
+            "edge_id": edge.edge_id,
+            "source": edge.source_id,
+            "target": edge.target_id,
+            "relation": edge.relation.as_str(),
+        })
+    );
+    Ok(())
+}
+
+fn cmd_knowledge_unlink(edge_id: &str) -> anyhow::Result<()> {
+    let (_, _, svc, _) = open_knowledge_stack()?;
+    svc.unlink(edge_id)?;
+    println!("{}", serde_json::json!({"ok": true, "edge_id": edge_id}));
+    Ok(())
+}
+
+fn cmd_knowledge_neighbors(node_id: &str, direction: &str, limit: usize) -> anyhow::Result<()> {
+    let (_, _, _, repo) = open_knowledge_stack()?;
+    let dir = match direction {
+        "outgoing" | "out" => NeighborDirection::Outgoing,
+        "incoming" | "in" => NeighborDirection::Incoming,
+        _ => NeighborDirection::Both,
+    };
+    let edges = repo.neighbors(node_id, dir, None, limit)?;
+    for e in edges {
+        println!(
+            "{}\t{} -[{}]-> {}\t{:?}",
+            e.edge_id,
+            e.source_id,
+            e.relation.as_str(),
+            e.target_id,
+            e.weight
+        );
+    }
+    Ok(())
+}
+
+fn cmd_knowledge_count() -> anyhow::Result<()> {
+    let (_, _, _, repo) = open_knowledge_stack()?;
+    println!("{}", repo.count()?);
+    Ok(())
+}
+
 fn cmd_status() -> anyhow::Result<()> {
     let dt_dir = dt_core::resolve_dt_dir();
     let store = open_event_store()?;
@@ -325,6 +561,31 @@ fn main() -> anyhow::Result<()> {
             EventCmd::Get { event_id } => cmd_event_get(&event_id),
             EventCmd::Verify => cmd_event_verify(),
             EventCmd::Count => cmd_event_count(),
+        },
+        Commands::Knowledge { cmd } => match cmd {
+            KnowledgeCmd::Create { node_type, title, body } => {
+                cmd_knowledge_create(&node_type, &title, &body)
+            }
+            KnowledgeCmd::Get { node_id } => cmd_knowledge_get(&node_id),
+            KnowledgeCmd::List { node_type, limit } => {
+                cmd_knowledge_list(node_type.as_deref(), limit)
+            }
+            KnowledgeCmd::Search { query, limit } => cmd_knowledge_search(&query, limit),
+            KnowledgeCmd::Update { node_id, title, body, status } => cmd_knowledge_update(
+                &node_id,
+                title.as_deref(),
+                body.as_deref(),
+                status.as_deref(),
+            ),
+            KnowledgeCmd::Delete { node_id } => cmd_knowledge_delete(&node_id),
+            KnowledgeCmd::Link { source, target, relation, weight } => {
+                cmd_knowledge_link(&source, &target, &relation, weight)
+            }
+            KnowledgeCmd::Unlink { edge_id } => cmd_knowledge_unlink(&edge_id),
+            KnowledgeCmd::Neighbors { node_id, direction, limit } => {
+                cmd_knowledge_neighbors(&node_id, &direction, limit)
+            }
+            KnowledgeCmd::Count => cmd_knowledge_count(),
         },
         Commands::Generate { target } => cmd_generate(target),
         Commands::ValidateSchemas => cmd_validate_schemas(),
