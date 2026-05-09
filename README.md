@@ -40,11 +40,13 @@ A **production-grade, local-first, AI-native Digital Twin** platform.
 | `dt-event`    | Append-only event sourcing engine                              |
 | `dt-knowledge`| **Knowledge graph API** — projection over the event log        |
 | `dt-graph-ui` | Terminal UI + headless dashboard + graph exporters (Mermaid/DOT/JSON) |
-| `dt-sync`     | Hybrid vector clocks + CRDT primitives (LWW, OR-Set) + delta   |
+| `dt-sync`     | Hybrid vector clocks + CRDT primitives (LWW, OR-Set) + delta + QUIC transport |
 | `dt-schema`   | Schema registry, JSON Schema validation                        |
-| `dt-codegen`  | Codegen → Rust / Python / TypeScript from schemas              |
+| `dt-codegen`  | Codegen → Rust / Python / TypeScript + SQL migrations from schemas |
 | `dt-agent`    | Agent IPC over Unix socket + CBOR, runtime registry, sandbox   |
 | `dt-cli`      | The `dt` command-line tool                                     |
+| `dt-embeddings`| Local embedding pipeline via ONNX Runtime + Ollama API        |
+| `dt-daemon`   | Agent IPC daemon (`dtd`) with WASM sandbox                     |
 
 ---
 
@@ -334,10 +336,10 @@ cargo test -p dt-event --test integration
 - [x] **Knowledge Graph API (`dt-knowledge`) — CRUD, FTS5, edges, walk**
 - [x] **Meta-cognition + Lean 4 verification integration** ← *just shipped*
 - [x] **Reasoning engine + graph exporters (Mermaid/DOT/JSON) + TUI** ← *just shipped*
-- [ ] Sync engine: QUIC transport + delta protocol
-- [ ] Agent IPC daemon (`dtd`) with WASM sandbox
-- [ ] Schema-driven SQL migration codegen
-- [ ] Local embedding pipeline (nomic via Ollama / llama.cpp)
+- [x] **Sync engine: QUIC transport + delta protocol** ← *just shipped*
+- [x] **Agent IPC daemon (`dtd`) with WASM sandbox** ← *just shipped*
+- [x] **Schema-driven SQL migration codegen** ← *just shipped*
+- [x] **Local embedding pipeline (nomic via Ollama / llama.cpp)** ← *just shipped*
 
 ---
 

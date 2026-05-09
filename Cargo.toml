@@ -4,12 +4,14 @@ members = [
     "crates/dt-db",
     "crates/dt-event",
     "crates/dt-knowledge",
-    "crates/dt-graph-ui",
     "crates/dt-sync",
     "crates/dt-schema",
     "crates/dt-codegen",
     "crates/dt-agent",
     "crates/dt-cli",
+    "crates/dt-graph-ui",
+    "crates/dt-embeddings",
+    "crates/dt-daemon",
 ]
 resolver = "2"
 
@@ -63,12 +65,15 @@ base64 = "0.21"
 # Internal (versioned together)
 dt-core = { path = "crates/dt-core" }
 dt-db = { path = "crates/dt-db" }
+dt-event = { path = "crates/dt-event" }
+dt-knowledge = { path = "crates/dt-knowledge" }
 dt-sync = { path = "crates/dt-sync" }
 dt-schema = { path = "crates/dt-schema" }
 dt-codegen = { path = "crates/dt-codegen" }
 dt-agent = { path = "crates/dt-agent" }
-dt-event = { path = "crates/dt-event" }
-dt-knowledge = { path = "crates/dt-knowledge" }
+dt-cli = { path = "crates/dt-cli" }
 dt-graph-ui = { path = "crates/dt-graph-ui" }
+dt-embeddings = { path = "crates/dt-embeddings" }
+dt-daemon = { path = "crates/dt-daemon" }
 
 uuid = { version = "1.7", features = ["v7", "serde"] }

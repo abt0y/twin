@@ -1,21 +1,30 @@
 [package]
-name = "dt-codegen"
+name = "dt-daemon"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[[bin]]
+name = "dtd"
+path = "src/main.rs"
+
 [dependencies]
 dt-core = { workspace = true }
-dt-schema = { workspace = true }
+dt-agent = { workspace = true }
+dt-event = { workspace = true }
 
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_cbor = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
-handlebars = "4.5"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+clap = { version = "4.6", features = ["derive"] }
+wasmtime = "20.0"
+wasmtime-wasi = "20.0"
+nix = "0.28"
+shellexpand = "3.1"
 chrono = "0.4"
-
-[dev-dependencies]
-tempfile = "3.9"

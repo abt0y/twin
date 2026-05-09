@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub mod vector_clock;
 pub mod crdt;
 pub mod delta;
+pub mod quic;
 
 /// Peer sync state.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]

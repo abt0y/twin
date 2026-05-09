@@ -1,5 +1,5 @@
 [package]
-name = "dt-codegen"
+name = "dt-embeddings"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -7,14 +7,16 @@ license.workspace = true
 
 [dependencies]
 dt-core = { workspace = true }
-dt-schema = { workspace = true }
 
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
-handlebars = "4.5"
+tracing = "0.1"
+ndarray = "0.15"
+ort = "2.0.0-rc.12"  # ONNX Runtime for local inference
+reqwest = { version = "0.11", features = ["json"] }
 chrono = "0.4"
 
 [dev-dependencies]

@@ -8,6 +8,7 @@ use std::path::Path;
 pub mod rust;
 pub mod python;
 pub mod ts;
+pub mod migration;
 
 /// Code generation target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,3 +56,6 @@ pub fn generate_all(
 
     Ok(results)
 }
+
+/// Re-export migration module types and functions.
+pub use migration::{SqlDialect, Migration, MigrationDirection, generate_migrations};
